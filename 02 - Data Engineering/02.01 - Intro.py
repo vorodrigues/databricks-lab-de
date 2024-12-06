@@ -30,7 +30,7 @@
 
 # MAGIC %md ### 1.4. Navegação
 # MAGIC
-# MAGIC - Explore a interface do notebook para se familiarizar com os demais recursos como:
+# MAGIC - **Explore** a interface do notebook para se familiarizar com os demais recursos como:
 # MAGIC     - Tabela de conteúdos
 # MAGIC     - Explorador do workspace
 # MAGIC     - Navegador do catálogo
