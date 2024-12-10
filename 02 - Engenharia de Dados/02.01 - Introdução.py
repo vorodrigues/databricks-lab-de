@@ -68,7 +68,7 @@ from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 
 scope_name = 'my_data_source'
-key_name = 'access_token'
+key_name = 'my_access_token'
 
 w.secrets.create_scope(scope=scope_name)
 w.secrets.put_secret(scope=scope_name, key=key_name, string_value='my-token')

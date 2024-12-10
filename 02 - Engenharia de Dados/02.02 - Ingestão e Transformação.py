@@ -72,6 +72,14 @@ display(spark.read.parquet(source_path).limit(10))
 
 # COMMAND ----------
 
+# MAGIC %md ### Photon
+# MAGIC
+# MAGIC Photon is the next generation engine on the Databricks Lakehouse Platform that provides extremely fast query performance at low cost – from data ingestion, ETL, streaming, data science and interactive queries – directly on your data lake. Photon is compatible with Apache Spark™ APIs, so getting started is as easy as turning it on – no code changes and no lock-in.<br><br>
+# MAGIC
+# MAGIC <img src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*QZarN870-VON-hgRbejBdw.png" width=75%>
+
+# COMMAND ----------
+
 # MAGIC %md ### Auto Loader
 # MAGIC
 # MAGIC Auto Loader incrementally and efficiently processes new data files as they arrive in cloud storage.
@@ -138,13 +146,20 @@ bronzeDF = (spark.readStream.format("cloudFiles")
 # COMMAND ----------
 
 # MAGIC %md ### Constraints ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
-# MAGIC Constraints help us avoid bad data to flow through our pipeline and to help us identify potential issues with our data.
+# MAGIC
+# MAGIC Constraints help us avoid bad data to flow through our pipeline and to help us identify potential issues with our data. Enforced contraints ensure that the quality and integrity of data added to a table is automatically verified.
+# MAGIC
+# MAGIC When a enforced constraint is violated, the transaction fails with an error. Two types of constraints are supported:
+# MAGIC - NOT NULL: indicates that values in specific columns cannot be null.
+# MAGIC - CHECK: indicates that a specified boolean expression must be true for each input row.
 
 # COMMAND ----------
 
 # MAGIC %md ### Liquid Clustering ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC
-# MAGIC Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance. Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data, allowing data layout to evolve alongside analytic needs over time.
+# MAGIC Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance. Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data, allowing data layout to evolve alongside analytic needs over time.<br><br>
+# MAGIC
+# MAGIC <img src="https://miro.medium.com/v2/resize:fit:1400/1*u1w9IsT3qmZqnk9NghQ-fA.png">
 
 # COMMAND ----------
 
@@ -176,7 +191,9 @@ if not spark.catalog.tableExists(f"{catalog}.{database}.sales_silver"):
 
 # MAGIC %md ### Change Data Feed ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC
-# MAGIC Change data feed allows Databricks to track row-level changes between versions of a Delta table. When enabled on a Delta table, the runtime records change events for all the data written into the table. This includes the row data along with metadata indicating whether the specified row was inserted, deleted, or updated.
+# MAGIC Change data feed allows Databricks to track row-level changes between versions of a Delta table. When enabled on a Delta table, the runtime records change events for all the data written into the table. This includes the row data along with metadata indicating whether the specified row was inserted, deleted, or updated.<br><br>
+# MAGIC
+# MAGIC <img src="https://www.databricks.com/wp-content/uploads/2021/06/How-to-Simplify-CDC-with-Delta-Lakes-Change-Data-Feed-blog-img-3.jpg">
 
 # COMMAND ----------
 
