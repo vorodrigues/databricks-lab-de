@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md # 02.02 - Engenharia de Dados
+# MAGIC %md # 02.02 - Ingestão e Transformação
 
 # COMMAND ----------
 
@@ -42,6 +42,19 @@ project_path = dbutils.widgets.get("project_path")
 
 spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog}")
 spark.sql(f"CREATE DATABASE IF NOT EXISTS {catalog}.{database}")
+
+# COMMAND ----------
+
+# MAGIC %md ### 1.4. Inicializando variável
+# MAGIC
+# MAGIC - **Execute** a célula abaixo
+
+# COMMAND ----------
+
+from datetime import datetime
+
+start_time = datetime.now()
+print(start_time)
 
 # COMMAND ----------
 
@@ -89,17 +102,22 @@ display(spark.read.parquet(source_path).limit(10))
 
 # COMMAND ----------
 
+schema = spark.read.parquet(source_path).schema.simpleString()[7:-1].replace(":"," ")
+print(schema)
+
+# COMMAND ----------
+
 # Ingest data using Auto Loader.
 bronzeDF = (spark.readStream.format("cloudFiles")
   .option("cloudFiles.format", "parquet")
+  .option("cloudFiles.schemaHints", schema)
   .option("cloudFiles.schemaLocation", project_path+"/schemas/bronze")
-  .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
-  .option("cloudFiles.inferColumnTypes", True)
   .option("locale", "BR")
   .load(source_path))
 
 # Write Stream as Delta Table
 (bronzeDF.writeStream
+  .option("mergeSchema", "true")
   .option("checkpointLocation", project_path+"/checkpoints/bronze")
   .trigger(availableNow=True)
   .toTable(f"{catalog}.{database}.sales_bronze")
@@ -139,7 +157,7 @@ bronzeDF = (spark.readStream.format("cloudFiles")
 from pyspark.sql.functions import col
 from datetime import datetime
 
-if not spark.catalog.tableExists(f"{catalog}.{database}.sales"):
+if not spark.catalog.tableExists(f"{catalog}.{database}.sales_silver"):
 
   df_silver = (spark.read
     .table(f"{catalog}.{database}.sales_bronze")
@@ -289,11 +307,6 @@ prod_df = (spark.readStream
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC select count(*) from vr_demo.handson_de.dim_product
-
-# COMMAND ----------
-
 # MAGIC %md ### 5.2. Dimensão de Lojas
 # MAGIC
 # MAGIC - **Execute** as células abaixo
@@ -341,6 +354,8 @@ store_df = (spark.readStream
 # MAGIC %md ### 5.3. Fato de Vendas
 # MAGIC
 # MAGIC - **Execute** as células abaixo
+# MAGIC - Em **Catalog**, procure a tabela `sales_gold`
+# MAGIC - Clique em **View relationships**
 
 # COMMAND ----------
 
@@ -380,101 +395,8 @@ gold_df = (spark.readStream
 
 # COMMAND ----------
 
-# MAGIC %md ## 6. Otimização dos dados
+# MAGIC %md ## 6. Passando variáveis para outras tarefas de um Workflow
 
 # COMMAND ----------
 
-# MAGIC %md ### Vacuum ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
-# MAGIC
-# MAGIC VACUUM removes all files from the table directory that are not managed by Delta, as well as data files that are no longer in the latest state of the transaction log for the table and are older than a retention threshold. 
-# MAGIC
-# MAGIC `VACUUM table_name`
-
-# COMMAND ----------
-
-# MAGIC %md ### Optimize ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
-# MAGIC
-# MAGIC Optimizes the layout of Delta Lake data. Optionally optimize a subset of data or collocate data by column. If you do not specify collocation and the table is not defined with liquid clustering, bin-packing optimization is performed.
-# MAGIC
-# MAGIC `OPTIMIZE table_name`
-
-# COMMAND ----------
-
-# MAGIC %md ### Analyze ![](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
-# MAGIC
-# MAGIC The ANALYZE TABLE statement collects estimated statistics about a specific table or all tables in a specified schema. These statistics are used by the query optimizer to generate an optimal query plan.
-# MAGIC
-# MAGIC `ANALYZE TABLE table_name COMPUTE STATISTICS FOR ALL COLUMNS`<br>
-# MAGIC `ANALYZE TABLES IN schema_name COMPUTE STATISTICS`
-
-# COMMAND ----------
-
-# MAGIC %md ### Predictive Optimization
-# MAGIC
-# MAGIC Predictive optimization removes the need to manually manage maintenance operations for Unity Catalog managed tables on Databricks.
-# MAGIC
-# MAGIC With predictive optimization enabled, Databricks automatically identifies tables that would benefit from maintenance operations and runs them for the user. Maintenance operations are only run as necessary, eliminating both unnecessary runs for maintenance operations and the burden associated with tracking and troubleshooting performance.
-# MAGIC
-# MAGIC <br><img src="https://www.databricks.com/sites/default/files/2024-05/db-976-blog-img-og.png?v=1717158571" width="60%"><br><br>
-
-# COMMAND ----------
-
-# MAGIC %md ### 6.1. Otimizando dados do nosso banco de dados
-# MAGIC
-# MAGIC - **Execute** a célula abaixo
-
-# COMMAND ----------
-
-spark.sql(f"ALTER DATABASE {catalog}.{database} ENABLE PREDICTIVE OPTIMIZATION")
-
-# COMMAND ----------
-
-# MAGIC %md ## 7. Governança dos dados
-
-# COMMAND ----------
-
-# MAGIC %md ### 7.1. Controle de acesso (ACLs)
-# MAGIC
-# MAGIC - **Execute** a célula abaixo
-
-# COMMAND ----------
-
-spark.sql(f"GRANT USAGE ON CATALOG {catalog} TO `<user/group/service_principal>`")
-spark.sql(f"GRANT USAGE ON DATABASE {catalog}.{database} TO `<user/group/service_principal>`")
-spark.sql(f"GRANT SELECT ON DATABASE {catalog}.{database}.sales_gold TO `<user/group/service_principal>`")
-spark.sql(f"GRANT SELECT ON DATABASE {catalog}.{database}.dim_product TO `<user/group/service_principal>`")
-spark.sql(f"GRANT SELECT ON DATABASE {catalog}.{database}.dim_store TO `<user/group/service_principal>`")
-
-# COMMAND ----------
-
-# MAGIC %md ### 7.2. Column-Level Masking
-# MAGIC
-# MAGIC - **Execute** as células abaixo
-
-# COMMAND ----------
-
-spark.sql(f"""
-  CREATE OR REPLACE FUNCTION {catalog}.{database}.mask_column_with_hash(col STRING)
-  RETURN CASE WHEN is_member('<group>') THEN col ELSE SHA2(col, 256) END
-""")
-
-# COMMAND ----------
-
-spark.sql(f"ALTER TABLE {catalog}.{database}.sales_gold ALTER COLUMN sales_id SET MASK {catalog}.{database}.mask_column_with_hash")
-
-# COMMAND ----------
-
-# MAGIC %md ### 7.3. Row-Level Security
-# MAGIC
-# MAGIC - **Execute** as células abaixo
-
-# COMMAND ----------
-
-spark.sql(f"""
-  CREATE FUNCTION {catalog}.{database}.supplier_row_filter(col STRING)
-  RETURN IF(is_member('<group>'), true, col='SUPPLIER 08')
-""")
-
-# COMMAND ----------
-
-spark.sql(f"ALTER TABLE {catalog}.{database}.dim_product SET ROW FILTER {catalog}.{database}.supplier_row_filter ON (supplier)")
+dbutils.jobs.taskValues.set(key="start_time", value=str(start_time))
