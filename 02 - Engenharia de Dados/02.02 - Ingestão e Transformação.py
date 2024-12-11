@@ -391,7 +391,7 @@ if not spark.catalog.tableExists(f"{catalog}.{database}.sales_gold"):
       CONSTRAINT sales_store_fk FOREIGN KEY (store_id) REFERENCES {catalog}.{database}.dim_store(store_id)
     )
     COMMENT 'Sales fact table'
-    CLUSTER BY (store_id)
+    CLUSTER BY (sales_id)
   """)
 
 # COMMAND ----------
