@@ -33,7 +33,7 @@
 # COMMAND ----------
 
 catalog = spark.conf.get("pipelines.catalog")
-database = spark.conf.get("pipelines.target")
+database = spark.conf.get("pipelines.schema")
 source_path = spark.conf.get("source_path")
 
 # COMMAND ----------
@@ -84,17 +84,17 @@ def dlt_sales_bronze():
 from pyspark.sql.functions import col, expr
 
 dlt.create_streaming_table(
-  name="dlt_sales_silver",
+  name=f"{catalog}.{database}.dlt_sales_silver",
   cluster_by=["date_key", "product_key", "store_key"],
   table_properties={"delta.enableChangeDataFeed" : "true"},
-  expect_all_or_drop={
+  expect_all={
     "valid_sales_id": "sales_id IS NOT NULL", 
     "valid_market_key": "market_key IN ('US', 'BR')"
   }
 )
 
 dlt.apply_changes(
-  target = "dlt_sales_silver",
+  target = f"{catalog}.{database}.dlt_sales_silver",
   source = "dlt_sales_bronze",
   keys = ["sales_id"],
   sequence_by = col("date_key"),
@@ -103,13 +103,6 @@ dlt.apply_changes(
   except_column_list=["_rescued_data"],
   stored_as_scd_type = 1
 )
-
-# COMMAND ----------
-
-@dlt.expect_or_drop("invalid_record", "(sales_id IS NULL) OR (market_key NOT IN ('US', 'BR'))")
-@dlt.table()
-def dlt_sales_silver_quarantine():
-  return dlt.read_stream("dlt_sales_bronze")
 
 # COMMAND ----------
 
@@ -127,9 +120,13 @@ def dlt_sales_silver_quarantine():
 
 # COMMAND ----------
 
-@dlt.table(spark_conf={"readChangeFeed" : "true"}, temporary=True)
+@dlt.view()
 def dlt_dim_product_feed():
-  return dlt.read_stream("dlt_sales_silver").select("product_id", "supplier", "product", "upc", "date_key")
+  return (spark.readStream
+    .option("readChangeFeed", "true")
+    .table(f"{catalog}.{database}.dlt_sales_silver")
+    .select("product_id", "supplier", "product", "upc", "date_key")
+  )
   
 dlt.create_streaming_table(
   name="dlt_dim_product",
@@ -142,7 +139,7 @@ dlt.create_streaming_table(
     supplier STRING COMMENT 'Product supplier',
     product STRING COMMENT 'Product name',
     upc STRING COMMENT 'UPC / GTIN-13 code of the product. 13 digits. No check digit.',
-    CONSTRAINT _dlt_dim_product_pk PRIMARY KEY (product_id)
+    CONSTRAINT dlt_dim_product_pk PRIMARY KEY (product_id)
   """,
   comment="Product dimension table"
 )
@@ -162,9 +159,13 @@ dlt.apply_changes(
 
 # COMMAND ----------
 
-@dlt.table(spark_conf={"readChangeFeed" : "true"}, temporary=True)
+@dlt.view()
 def dlt_dim_store_feed():
-  return dlt.read_stream("dlt_sales_silver").select("store_id", "retailer", "store", "store_type", "store_zip", "store_lat_long", "date_key")
+  return (spark.readStream
+    .option("readChangeFeed", "true")
+    .table(f"{catalog}.{database}.dlt_sales_silver")
+    .select("store_id", "retailer", "store", "store_type", "store_zip", "store_lat_long", "date_key")
+  )
   
 dlt.create_streaming_table(
   name="dlt_dim_store",
@@ -179,7 +180,7 @@ dlt.create_streaming_table(
     store_type STRING COMMENT 'Type of store',
     store_zip STRING COMMENT 'Store zip/postal code',
     store_lat_long STRING COMMENT 'Store latitude and longitude',
-    CONSTRAINT _dlt_dim_store_pk PRIMARY KEY (store_id)
+    CONSTRAINT dlt_dim_store_pk PRIMARY KEY (store_id)
   """,
   comment="Store dimension table"
 )
@@ -199,9 +200,13 @@ dlt.apply_changes(
 
 # COMMAND ----------
 
-@dlt.table(spark_conf={"readChangeFeed" : "true"}, temporary=True)
+@dlt.view()
 def dlt_sales_gold_feed():
-  return dlt.read_stream("dlt_sales_silver").select("sales_id", "product_id", "store_id", "date_key", "sales_quantity", "sales_amount")
+  return (spark.readStream
+    .option("readChangeFeed", "true")
+    .table(f"{catalog}.{database}.dlt_sales_silver")
+    .select("sales_id", "product_id", "store_id", "date_key", "sales_quantity", "sales_amount")
+  )
   
 dlt.create_streaming_table(
   name="dlt_sales_gold",
@@ -216,9 +221,9 @@ dlt.create_streaming_table(
     date_key DATE COMMENT 'Date of sale',
     sales_quantity DECIMAL(10,0) COMMENT 'Quantity sold (units)',
     sales_amount DOUBLE COMMENT 'Amount sold (USD)',
-    CONSTRAINT _dlt_sales_gold_pk PRIMARY KEY (sales_id),
-    CONSTRAINT _dlt_sales_product_fk FOREIGN KEY (product_id) REFERENCES {catalog}.{database}.dim_product(product_id),
-    CONSTRAINT _dlt_sales_store_fk FOREIGN KEY (store_id) REFERENCES {catalog}.{database}.dim_store(store_id)
+    CONSTRAINT dlt_sales_gold_pk PRIMARY KEY (sales_id),
+    CONSTRAINT dlt_sales_product_fk FOREIGN KEY (product_id) REFERENCES {catalog}.{database}.dim_product(product_id),
+    CONSTRAINT dlt_sales_store_fk FOREIGN KEY (store_id) REFERENCES {catalog}.{database}.dim_store(store_id)
   """,
   comment="Sales fact table"
 )
