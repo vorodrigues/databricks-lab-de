@@ -185,7 +185,7 @@ if not spark.catalog.tableExists(f"{catalog}.{database}.sales_silver"):
     .saveAsTable(f"{catalog}.{database}.sales_silver"))
   
   spark.sql(f"ALTER TABLE {catalog}.{database}.sales_silver CHANGE COLUMN sales_id SET NOT NULL")
-  spark.sql(f"ALTER TABLE {catalog}.{database}.sales_silver ADD CONSTRAINT quantity CHECK (market_key IN ('US', 'BR'))")
+  spark.sql(f"ALTER TABLE {catalog}.{database}.sales_silver ADD CONSTRAINT valid_market_key CHECK (market_key IN ('US', 'BR'))")
 
 # COMMAND ----------
 
@@ -241,6 +241,7 @@ def merge_delta(microbatch, table, merge_keys, ts_key = None):
     MERGE INTO {table} t
     USING microbatch s
     ON {on_clause}
+    -- WHEN MATCHED AND s.op_code = 't' THEN TRUNCATE
     -- WHEN MATCHED AND s.op_code = 'd' THEN DELETE
     WHEN MATCHED THEN UPDATE SET *
     WHEN NOT MATCHED THEN INSERT *

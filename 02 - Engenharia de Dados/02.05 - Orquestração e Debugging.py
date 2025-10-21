@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md # 02.03 - Orquestração e Debugging
+# MAGIC %md # 02.05 - Orquestração e Debugging
 
 # COMMAND ----------
 
@@ -115,7 +115,7 @@
 
 from pyspark.sql.functions import lit
 
-source_path = "/path/to/my/folder"
+source_path = "s3://one-env/vr/handson_de/sales/parquet"
 dest_path = source_path+"/new"
 
 (spark.read.parquet(source_path).limit(1)

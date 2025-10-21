@@ -57,7 +57,7 @@ spark.sql(f"GRANT SELECT ON TABLE {catalog}.{database}.dim_store TO `{principal}
 
 # COMMAND ----------
 
-clm_principal = "my_principal"
+clm_principal = "vr_group"
 spark.sql(f"""
   CREATE OR REPLACE FUNCTION {catalog}.{database}.mask_column_with_hash(col STRING)
   RETURN CASE WHEN is_member('{clm_principal}') THEN col ELSE SHA2(col, 256) END
@@ -76,7 +76,7 @@ spark.sql(f"ALTER TABLE {catalog}.{database}.sales_gold ALTER COLUMN sales_id SE
 
 # COMMAND ----------
 
-rls_principal = "my_principal"
+rls_principal = "vr_group"
 spark.sql(f"""
   CREATE OR REPLACE FUNCTION {catalog}.{database}.supplier_row_filter(col STRING)
   RETURN IF(is_member('{rls_principal}'), true, col='SUPPLIER 08')
